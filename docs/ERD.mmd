@@ -1,0 +1,50 @@
+erDiagram
+  USERS {
+    int UserID PK
+    varchar FullName
+    varchar Email
+    varchar PasswordHash
+    varchar Role
+    datetime CreatedAt
+    datetime UpdatedAt
+  }
+  PERMIT_TYPES {
+    int id PK
+    varchar PermitName
+    text Description
+    decimal Fee
+    datetime createdAt
+    datetime updatedAt
+  }
+  APPLICATIONS {
+    int id PK
+    varchar BusinessName
+    enum Status
+    datetime SubmittedAt
+    int UserID FK
+    int PermitTypeID FK
+    datetime createdAt
+    datetime updatedAt
+  }
+  PAYMENTS {
+    int id PK
+    decimal Amount
+    varchar PaymentMethod
+    datetime PaidAt
+    int ApplicationID FK
+    datetime createdAt
+    datetime updatedAt
+  }
+  APPLICATION_DOCUMENTS {
+    int id PK
+    varchar FileName
+    varchar FilePath
+    datetime UploadedAt
+    int ApplicationID FK
+    datetime createdAt
+    datetime updatedAt
+  }
+  USERS ||--o{ APPLICATIONS : has
+  PERMIT_TYPES ||--o{ APPLICATIONS : has
+  APPLICATIONS ||--o{ PAYMENTS : has
+  APPLICATIONS ||--o{ APPLICATION_DOCUMENTS : has

@@ -1,0 +1,1366 @@
+{
+  "info": {
+    "_postman_id": "0926366a-7508-5cc0-ac8d-88130dc548a7",
+    "name": "e-Permit and Business Licensing System",
+    "description": "Run in order: 1) Authentication (Register -> Login saves the JWT automatically), 2) each resource folder, 3) Security & Validation tests, 4) Cleanup. IDs and the token are stored in collection variables, so nothing needs to be copied by hand. Set baseUrl if your port differs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "permitTypeId",
+      "value": ""
+    },
+    {
+      "key": "applicationId",
+      "value": ""
+    },
+    {
+      "key": "applicationDocumentId",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@example.com\",\n  \"fullName\": \"Demo User\",\n  \"password\": \"Password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Creates the demo account. A 409 simply means it already exists — go on to Login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Created (201) or already registered (409)', function () { pm.expect([201, 409]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Password hash is never returned', function () { pm.expect(json).to.not.have.property('passwordHash'); });",
+                  "  pm.collectionVariables.set('userId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@example.com\",\n  \"password\": \"Password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Returns the JWT. The token is stored in the {{token}} collection variable automatically."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Response contains a JWT access_token', function () { pm.expect(json.access_token).to.be.a('string').and.not.empty; });",
+                  "// Saved automatically — every other request uses {{token}} via the collection's Bearer auth.",
+                  "pm.collectionVariables.set('token', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me (JWT)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Protected route. Uses the Bearer token saved by Login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Returns the logged-in user without a password', function () {",
+                  "  pm.expect(json).to.have.property('email');",
+                  "  pm.expect(json).to.not.have.property('passwordHash');",
+                  "});",
+                  "pm.collectionVariables.set('userId', json.id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2.1 PermitType",
+      "item": [
+        {
+          "name": "PermitType — List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Body is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PermitType — Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types/count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types",
+                "count"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has numeric total', function () { pm.expect(pm.response.json().total).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PermitType — Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permitname\": \"Sample PermitName\",\n  \"description\": \"Sample Description\",\n  \"fee\": 100.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Returns the new id', function () { pm.expect(json.id).to.be.a('number'); });",
+                  "pm.collectionVariables.set('permitTypeId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PermitType — Read one",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types/{{permitTypeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types",
+                "{{permitTypeId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returns the record created above', function () { pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('permitTypeId'))); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PermitType — Update",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types/{{permitTypeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types",
+                "{{permitTypeId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permitname\": \"Sample PermitName (Updated)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Field was updated', function () { pm.expect(pm.response.json()).to.have.property('permitname'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2.2 Application",
+      "item": [
+        {
+          "name": "Application — List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "applications"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Body is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Application — Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/applications/count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "applications",
+                "count"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has numeric total', function () { pm.expect(pm.response.json().total).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Application — Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "applications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessname\": \"Sample BusinessName\",\n  \"status\": \"pending\",\n  \"submittedat\": \"2026-12-01T09:00:00.000Z\",\n  \"userid\": {{userId}},\n  \"permittypeid\": {{permitTypeId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Foreign keys use variables saved by earlier requests (parents are created first)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Returns the new id', function () { pm.expect(json.id).to.be.a('number'); });",
+                  "pm.collectionVariables.set('applicationId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Application — Read one",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "applications",
+                "{{applicationId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returns the record created above', function () { pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('applicationId'))); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Application — Update",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "applications",
+                "{{applicationId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Field was updated', function () { pm.expect(pm.response.json()).to.have.property('status'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PermitType — Delete while a Application still references it → 409",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types/{{permitTypeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types",
+                "{{permitTypeId}}"
+              ]
+            },
+            "description": "ON DELETE RESTRICT: a parent that still has child records cannot be deleted (the child created above still exists)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2.3 ApplicationDocument",
+      "item": [
+        {
+          "name": "ApplicationDocument — List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/application-documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "application-documents"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Body is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ApplicationDocument — Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/application-documents/count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "application-documents",
+                "count"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has numeric total', function () { pm.expect(pm.response.json().total).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ApplicationDocument — Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/application-documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "application-documents"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filename\": \"Sample FileName\",\n  \"filepath\": \"Sample FilePath\",\n  \"uploadedat\": \"2026-12-01T09:00:00.000Z\",\n  \"applicationid\": {{applicationId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Foreign keys use variables saved by earlier requests (parents are created first)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Returns the new id', function () { pm.expect(json.id).to.be.a('number'); });",
+                  "pm.collectionVariables.set('applicationDocumentId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ApplicationDocument — Read one",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/application-documents/{{applicationDocumentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "application-documents",
+                "{{applicationDocumentId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returns the record created above', function () { pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('applicationDocumentId'))); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ApplicationDocument — Update",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/application-documents/{{applicationDocumentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "application-documents",
+                "{{applicationDocumentId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filename\": \"Sample FileName (Updated)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Field was updated', function () { pm.expect(pm.response.json()).to.have.property('filename'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ApplicationDocument — Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/application-documents/{{applicationDocumentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "application-documents",
+                "{{applicationDocumentId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Reports deleted', function () { pm.expect(pm.response.json().deleted).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2.4 Payment",
+      "item": [
+        {
+          "name": "Payment — List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Body is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payment — Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "count"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has numeric total', function () { pm.expect(pm.response.json().total).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payment — Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100.0,\n  \"paymentmethod\": \"Sample PaymentMethod\",\n  \"paidat\": \"2026-12-01T09:00:00.000Z\",\n  \"applicationid\": {{applicationId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Foreign keys use variables saved by earlier requests (parents are created first)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Returns the new id', function () { pm.expect(json.id).to.be.a('number'); });",
+                  "pm.collectionVariables.set('paymentId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payment — Read one",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{paymentId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returns the record created above', function () { pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('paymentId'))); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payment — Update",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{paymentId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentmethod\": \"Sample PaymentMethod (Updated)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Field was updated', function () { pm.expect(pm.response.json()).to.have.property('paymentmethod'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payment — Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{paymentId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Reports deleted', function () { pm.expect(pm.response.json().deleted).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Security & Validation Tests",
+      "item": [
+        {
+          "name": "Protected route WITHOUT token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Proves the route is protected. Expected: 401 Unauthorized."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Protected route with INVALID token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "invalid.token.value",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login with wrong password → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@example.com\",\n  \"password\": \"WrongPassword999\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register with invalid input → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"fullName\": \"X\",\n  \"password\": \"short\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Input validation (class-validator) rejects bad data."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PermitType — Create with empty body → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PermitType — Read non-existent id → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Application — Create with non-existent foreign key → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "applications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessname\": \"Sample BusinessName\",\n  \"status\": \"pending\",\n  \"submittedat\": \"2026-12-01T09:00:00.000Z\",\n  \"userid\": 999999,\n  \"permittypeid\": 999999\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Foreign-key constraint: the referenced parent record does not exist."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Cleanup (delete parents last)",
+      "item": [
+        {
+          "name": "Application — Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "applications",
+                "{{applicationId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Reports deleted', function () { pm.expect(pm.response.json().deleted).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PermitType — Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/permit-types/{{permitTypeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "permit-types",
+                "{{permitTypeId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Reports deleted', function () { pm.expect(pm.response.json().deleted).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
